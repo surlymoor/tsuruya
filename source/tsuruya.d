@@ -167,8 +167,8 @@ private mixin template OptionImpl(string nameSpecification, T, alias defaultValu
 private mixin template OptionNames(string nameSpecification)
 {
 	import std.algorithm : splitter, until;
-	import std.array : array;
-	static immutable longName = nameSpecification.until("|").until("+").array;
+	import std.conv : to;
+	static immutable longName = nameSpecification.until("|").until("+").to!string;
 	static immutable shortName = nameSpecification.splitter('|').shortName;
 }
 
@@ -212,12 +212,11 @@ private auto shortName(R)(R range)
 if (isInputRange!R && is(Unqual!(ElementEncodingType!(ElementType!R)) : char))
 {
 	import std.algorithm : filter, map, until;
-	import std.array : array;
 	import std.conv : to;
 	import std.range : front, walkLength;
 	auto result = range.map!(r => r.until("+")).filter!(r => r.walkLength == 1);
 	if (result.empty) return "";
-	else return result.front.array.to!string;
+	else return result.front.to!string;
 }
 
 /// Instances of `OptionSetting` types contained in `settings`.
