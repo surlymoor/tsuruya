@@ -2,7 +2,7 @@
 module tsuruya;
 
 import std.range : ElementEncodingType, ElementType, isInputRange;
-import std.traits : arity, isCallable, isInstanceOf, isType, Parameters, ReturnType, Unqual;
+import std.traits : arity, isCallable, isType, Parameters, ReturnType, Unqual;
 
 @safe:
 
@@ -44,7 +44,7 @@ if (isValidParameterProcessor!processor)
 }
 
 /**
-	Determines if a callable object may be used as a processor of command-line parameters and, by extension, options.
+	Determines if a callable object may be used as a processor of command-line parameters and options.
 
 	As mentioned, the object must be callable; it must take only one argument of type string; and it must return a
 	value.
@@ -205,7 +205,8 @@ unittest
 	Returns the first element of a range that consists of one character and thus is considered a "short name".
 
 	Params:
-		range = An input range whose elements are convertible to `char` arrays.
+		range = An input range whose elements are convertible to `char` arrays. It is assumed that every element does
+			not contain a bar '|'.
 */
 pure
 private auto shortName(R)(R range)
