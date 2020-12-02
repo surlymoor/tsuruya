@@ -220,30 +220,64 @@ if (isInputRange!R && is(Unqual!(ElementEncodingType!(ElementType!R)) : char))
 	else return result.front.to!string;
 }
 
-/// Instances of `OptionSetting` types contained in `settings`.
+/// Field definitions of option settings
 private mixin template OptionSettings(settings...)
 {
-	static foreach (setting; settings)
+	import std.traits : getSymbolsByUDA;
+	static foreach (Setting; getSymbolsByUDA!(tsuruya, OptionSetting))
 	{
-		mixin(q{static immutable }, typeof(setting).id, q{ = setting.value;});
+		mixin(q{static immutable }, Setting.id, q{ = getSettingValue!(Setting, settings);});
 	}
 }
 
-/// A category under which the option is placed in the help text.
-alias OptionCategory = OptionSetting!("category", string);
-/// A description of the option as seen in the help text
-alias OptionDesc = OptionSetting!("desc", string);
-/// A more elaborated description of the option
-alias OptionHelp = OptionSetting!("help", string);
-/// A signal as to whether the option is required to be present in the command-line arguments.
-alias OptionRequired = OptionSetting!("required", bool, true);
-
 ///
-private struct OptionSetting(string identifier, T, T defaultValue = T.init)
+private template getSettingValue(Setting, settings...)
+{
+	import std.format : format;
+	import std.meta : staticIndexOf, staticMap;
+	enum idx = staticIndexOf!(Setting, staticMap!(TypeOf, settings));
+	static if (idx == -1) enum getSettingValue = Setting.defaultValue;
+	else enum getSettingValue = settings[idx].value;
+}
+
+/// Resolves to the type of `instance`.
+private alias TypeOf(alias instance) = typeof(instance);
+
+/// A category under which the option is placed in the help text.
+@OptionSetting
+struct OptionCategory
+{
+	mixin OptionSettingImpl!("category", string, "");
+}
+/// A description of the option as seen in the help text
+@OptionSetting
+struct OptionDesc
+{
+	mixin OptionSettingImpl!("desc", string, "");
+}
+/// A more elaborated description of the option
+@OptionSetting
+struct OptionHelp
+{
+	mixin OptionSettingImpl!("help", string, "");
+}
+/// A signal as to whether the option is required to be present in the command-line arguments.
+@OptionSetting
+struct OptionRequired
+{
+	mixin OptionSettingImpl!("required", bool);
+}
+
+/// Attribute to identify aggregates as option settings
+private enum OptionSetting;
+
+/// Option setting implementation
+private mixin template OptionSettingImpl(string identifier, T, T defaultValue = T.init)
 {
 	private static immutable id = identifier;
-	///
-	T value = defaultValue;
+	private static immutable defVal = defaultValue;
+	/// The option setting's value
+	auto value = defaultValue;
 }
 
 ///
