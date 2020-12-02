@@ -169,7 +169,8 @@ private mixin template OptionNames(string nameSpecification)
 	import std.algorithm : splitter, until;
 	import std.conv : to;
 	static immutable longName = nameSpecification.until("|").until("+").to!string;
-	static immutable shortName = nameSpecification.splitter('|').shortName;
+	static immutable shortName = nameSpecification.splitter('|').extractShortName;
+	static immutable id = longName.extractOptionID;
 }
 
 unittest
@@ -209,7 +210,7 @@ unittest
 			not contain a bar '|'.
 */
 pure
-private auto shortName(R)(R range)
+private auto extractShortName(R)(R range)
 if (isInputRange!R && is(Unqual!(ElementEncodingType!(ElementType!R)) : char))
 {
 	import std.algorithm : filter, map, until;
@@ -218,6 +219,32 @@ if (isInputRange!R && is(Unqual!(ElementEncodingType!(ElementType!R)) : char))
 	auto result = range.map!(r => r.until("+")).filter!(r => r.walkLength == 1);
 	if (result.empty) return "";
 	else return result.front.to!string;
+}
+
+///
+pure
+private string extractOptionID(R)(R range)
+if (isInputRange!R && is(Unqual!(ElementEncodingType!R) : char))
+{
+	import std.algorithm : joiner, map, splitter;
+	import std.format : format;
+	import std.conv: to;
+	import std.range : chain, dropOne, front, walkLength;
+	import std.uni : asCapitalized, isAlpha;
+	auto words = range.splitter("-");
+	if (words.walkLength == 1) return range;
+	auto id = words.front.chain(words.dropOne.map!asCapitalized.joiner).to!string;
+	if (id.front != '_' && !id.front.isAlpha) assert(0, format!"'%s' must not begin with a digit"(range));
+	return id;
+}
+
+@trusted
+unittest
+{
+	import core.exception : AssertError;
+	import std.exception : assertThrown;
+	static assert("long-option-name".extractOptionID == "longOptionName");
+	assertThrown!AssertError("42-option-name".extractOptionID);
 }
 
 /// Field definitions of option settings
