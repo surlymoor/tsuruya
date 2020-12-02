@@ -1,0 +1,11 @@
+{
+	"authors": [
+		"surlymoor"
+	],
+	"copyright": "Copyright © 2020, surlymoor",
+	"description": "A command-line argument parsing library",
+	"license": "0BSD",
+	"name": "tsuruya",
+	"targetPath": "bin",
+	"targetType": "library"
+}

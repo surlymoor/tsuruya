@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/tsuruya
+tsuruya.so
+tsuruya.dylib
+tsuruya.dll
+tsuruya.a
+tsuruya.lib
+tsuruya-test-*
+*.exe
+*.o
+*.obj
+*.lst
+.vscode
+bin
