@@ -2,7 +2,7 @@
 module tsuruya;
 
 import std.range : ElementEncodingType, ElementType, isInputRange;
-import std.traits : arity, isCallable, isType, Parameters, ReturnType, Unqual;
+import std.traits : arity, isAggregateType, isCallable, isType, Parameters, ReturnType, Unqual;
 
 @safe:
 
@@ -13,18 +13,9 @@ import std.traits : arity, isCallable, isType, Parameters, ReturnType, Unqual;
 		identifier = The parameter's identifier used in the command-line interface and programming interface.
 		T = The type of the value the parameter will take.
 */
-struct Parameter(string identifier, T)
+struct Parameter(string identifier, T = string)
 {
 	mixin ParameterImpl!(identifier, T);
-}
-
-/// Command-line parameter's implementation
-private mixin template ParameterImpl(string identifier, T)
-{
-	/// The parameter's name as used in the command-line interface and in the programming interface.
-	static immutable id = identifier;
-	/// The parameter's value, i.e. the value on which the parameter takes.
-	T value;
 }
 
 /**
@@ -54,6 +45,15 @@ if (isValidParameterProcessor!processor)
 */
 enum isValidParameterProcessor(alias processor) = isCallable!processor && arity!processor == 1
 	&& is(Parameters!processor[0] == string) && !is(ReturnType!processor == void);
+
+/// Command-line parameter's implementation
+private mixin template ParameterImpl(string identifier, T)
+{
+	/// The parameter's name as used in the command-line interface and in the programming interface.
+	static immutable id = identifier;
+	/// The parameter's value, i.e. the value on which the parameter takes.
+	T value;
+}
 
 ///
 unittest
@@ -155,8 +155,8 @@ if (isValidParameterProcessor!processor)
 /// Command-line option's implementation
 private mixin template OptionImpl(string nameSpecification, T, alias defaultValue, settings...)
 {
-	mixin OptionSettings!settings;
 	mixin OptionNames!nameSpecification;
+	mixin OptionSettings!settings;
 	///
 	static immutable nameSpec = nameSpecification;
 	///
@@ -236,7 +236,7 @@ private template getSettingValue(Setting, settings...)
 	import std.format : format;
 	import std.meta : staticIndexOf, staticMap;
 	enum idx = staticIndexOf!(Setting, staticMap!(TypeOf, settings));
-	static if (idx == -1) enum getSettingValue = Setting.defaultValue;
+	static if (idx == -1) enum getSettingValue = Setting.defVal;
 	else enum getSettingValue = settings[idx].value;
 }
 
@@ -281,7 +281,49 @@ private mixin template OptionSettingImpl(string identifier, T, T defaultValue = 
 }
 
 ///
-auto parseArgs(CLIObjs)(string[] args)
+auto parseArgs(CLIObjects...)(string[] args)
 {
+	import std.getopt : config, getopt;
+	import std.meta : Filter;
 
+	alias Parameters = Filter!(isParameter, CLIObjects);
+	alias Options = Filter!(isOption, CLIObjects);
+	Parameters params;
+	Options opts;
+}
+
+/// Determines whether `T` may be considered a command-line parameter.
+template isParameter(T)
+if (isAggregateType!T)
+{
+	import std.traits : hasMember, hasStaticMember;
+	static if (!hasStaticMember!(T, "id") || !is(typeof(T.id) == immutable(string)))
+		enum isParameter = false;
+	else static if (!hasMember!(T, "value"))
+		enum isParameter = false;
+	else enum isParameter = true;
+}
+
+/// Determines whether `T` may be considered a command-line option.
+template isOption(T)
+if (isAggregateType!T)
+{
+	import std.traits : hasMember, hasStaticMember;
+	static if (!hasStaticMember!(T, "category") || !is(typeof(T.category) == immutable(string)))
+		enum isOption = false;
+	else static if (!hasStaticMember!(T, "desc") || !is(typeof(T.desc) == immutable(string)))
+		enum isOption = false;
+	else static if (!hasStaticMember!(T, "help") || !is(typeof(T.help) == immutable(string)))
+		enum isOption = false;
+	else static if (!hasStaticMember!(T, "required") || !is(typeof(T.required) == immutable(bool)))
+		enum isOption = false;
+	else static if (!hasStaticMember!(T, "longName") || !is(typeof(T.longName) == immutable(string)))
+		enum isOption = false;
+	else static if (!hasStaticMember!(T, "shortName") || !is(typeof(T.shortName) == immutable(string)))
+		enum isOption = false;
+	else static if (!hasStaticMember!(T, "nameSpec") || !is(typeof(T.nameSpec) == immutable(string)))
+		enum isOption = false;
+	else static if (!hasMember!(T, "value"))
+		enum isOption = false;
+	else enum isOption = true;
 }
