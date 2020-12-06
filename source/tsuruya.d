@@ -473,13 +473,17 @@ auto parseArgs(CommandLineParameters...)(string[] args)
 		_Operands operands;
 		_Options options;
 	private:
+		/*
+			It would be nice to avoid initializing the fields when defining them, since they'll be assigned a value
+			before use, but to handle symbols unknown to this scope, type inference, to my knowledge, is necessary.
+		*/
 		static struct _Operands
 		{
-			static foreach (Oper; Operands) mixin(typeof(Oper.value), " ", Oper.id, ";");
+			static foreach (Oper; Operands) mixin("auto ", Oper.id, q{ = Oper.value.init;});
 		}
 		static struct _Options
 		{
-			static foreach (Opt; Options) mixin(typeof(Opt.value), " ", Opt.id, ";");
+			static foreach (Opt; Options) mixin("auto ", Opt.id, q{ = Opt.value.init;});
 		}
 	}
 
