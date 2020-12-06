@@ -13,10 +13,17 @@ import std.traits : arity, isAggregateType, isCallable, isInstanceOf, isType, Pa
 /**
 	Command-line operand
 
+	The type of the operand's value determines how an argument (or arguments) will be processed into the operand.
+	Specifically, if the type is a dynamic array, or slice, then any remaining, non-option arguments will be converted
+	to the type of the type's elements and be placed into the operand. If the type is a static array, or slice, then at
+	most k-number of non-option arguments will be converted to the type of the type's elements and be placed into the
+	operand's value, where k is the type's static length. If the type isn't any kind of array, or slice, then only one
+	argument will be taken, converted, and become the operand's value. (Output ranges are not yet supported.)
+
 	Params:
 		identifier = The operand's identifier as used in the command-line interface and programming interface. For
 			the latter, simple transformations will be performed to make it into a valid D identifier.
-		T = The type of the value the operand will take.
+		T = The type of value the operand will take.
 		settings = Optional metadata
 */
 struct Operand(string identifier, T = string, settings...)
@@ -26,6 +33,12 @@ struct Operand(string identifier, T = string, settings...)
 
 /**
 	Command-line operand
+
+	The one parameter of the operand's `processor` may be of three different types: `string`, `string[]`, and
+	`string[k]`, where 'k' is some natural number and denotes the latter of the three as being a static array, or
+	slice. Thus, instead of the type of the operand's value determining the method by which an argument (or arguments)
+	will be manipulated and placed into the operand, it will be the type of this one parameter of `processor`. Besides
+	that, the same rules apply.
 
 	Params:
 		identifier = The operand's identifier as used in the command-line interface and programming interface. For
@@ -109,8 +122,10 @@ if (isInputRange!R && is(Unqual!(ElementEncodingType!R) : char))
 	auto words = range.splitter("-");
 	if (words.walkLength == 1) return range;
 	auto id = words.front.chain(words.dropOne.map!asCapitalized.joiner).to!string;
-	if (id.front != '_' && !id.front.isAlpha) assert(0);
-	if (id[1..$].canFind!(ch => ch != '_' && !ch.isAlphaNum)) assert(0);
+	if (id.front != '_' && !id.front.isAlpha) assert(0,
+		"A D identifier must only begin with an underscore or (universal) alphabetic character");
+	if (id[1..$].canFind!(ch => ch != '_' && !ch.isAlphaNum)) assert(0,
+		"A D identifier may only contain underscores, numbers, and (universal) alphabetic characters");
 	return id;
 }
 
@@ -148,7 +163,7 @@ struct Option(string nameSpecification, T, T defaultValue, optionSettings...)
 		T = The type of the value the option will take.
 		optionSettings = "Optional" metadata.
 */
-struct Option(string nameSpecification, T, optionSettings...)
+struct Option(string nameSpecification, T = string, optionSettings...)
 {
 	mixin OptionImpl!(nameSpecification, T, T.init, optionSettings);
 }
