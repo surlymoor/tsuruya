@@ -22,7 +22,8 @@ import std.traits : arity, isAggregateType, isCallable, isInstanceOf, isType, Pa
 
 	Params:
 		identifier = The operand's identifier as used in the command-line interface and programming interface. For
-			the latter, simple transformations will be performed to make it into a valid D identifier.
+			the latter, simple transformations will be performed to make it into a valid D identifier. If the latter
+			conflicts with a D keyword, e.g. `version`, then an underscore will be prefixed to it, e.g. "_version".
 		T = The type of value the operand will take.
 		settings = Optional metadata
 */
@@ -37,12 +38,13 @@ struct Operand(string identifier, T = string, settings...)
 	The one parameter of the operand's `processor` may be of three different types: `string`, `string[]`, and
 	`string[k]`, where 'k' is some natural number and denotes the latter of the three as being a static array, or
 	slice. Thus, instead of the type of the operand's value determining the method by which an argument (or arguments)
-	will be manipulated and placed into the operand, it will be the type of this one parameter of `processor`. Besides
-	that, the same rules apply.
+	will be manipulated and placed into the operand, it will be the type of this one parameter of `processor`.
+	Otherwise, the same rules apply.
 
 	Params:
 		identifier = The operand's identifier as used in the command-line interface and programming interface. For
-			the latter, simple transformations will be performed to make it into a valid D identifier.
+			the latter, simple transformations will be performed to make it into a valid D identifier. If the latter
+			conflicts with a D keyword, e.g. `version`, then an underscore will be prefixed to it, e.g. "_version".
 		processor = A callable object that processes the value given to the operand. The type of the operand's
 			value is determined by the processor's return type.
 		settings = Optional metadata
@@ -104,7 +106,8 @@ unittest
 
 	If the input is separated by hyphens, those hyphens will be removed; the first character of each block of text
 	after each hyphen will be capitalized, if possible. Thus, the result will be in camel case. If, after processing,
-	`range` still contains an invalid character for a D identifier, an error will be thrown.
+	`range` still contains an invalid character for a D identifier, an error will be thrown. If the `range` conflicts
+	with a D keyword, e.g. `version`, then an underscore will be prefixed to it, e.g. "_version".
 
 	Params:
 		range = An input range whose elements are convertible to `char`.
@@ -115,18 +118,23 @@ pure
 private string extractID(R)(R range)
 if (isInputRange!R && is(Unqual!(ElementEncodingType!R) : char))
 {
-	import std.algorithm : canFind, joiner, map, splitter;
+	import std.algorithm : canFind, equal, joiner, map, splitter;
 	import std.conv: to;
 	import std.range : chain, dropOne, front, walkLength;
 	import std.uni : asCapitalized, isAlpha, isAlphaNum;
 	auto words = range.splitter("-");
-	if (words.walkLength == 1) return range;
+	if (words.walkLength == 1)
+	{
+		if (range.isKeyword) return "_" ~ range;
+		else return range;
+	}
 	auto id = words.front.chain(words.dropOne.map!asCapitalized.joiner).to!string;
 	if (id.front != '_' && !id.front.isAlpha) assert(0,
 		"A D identifier must only begin with an underscore or (universal) alphabetic character");
 	if (id[1..$].canFind!(ch => ch != '_' && !ch.isAlphaNum)) assert(0,
 		"A D identifier may only contain underscores, numbers, and (universal) alphabetic characters");
-	return id;
+	if (id.isKeyword) return "_" ~ id;
+	else return id;
 }
 
 @trusted
@@ -135,8 +143,135 @@ unittest
 	import core.exception : AssertError;
 	import std.exception : assertThrown;
 	static assert("long-option-name".extractID == "longOptionName");
+	static assert("version".extractID == "_version");
 	assertThrown!AssertError("inv@lid-option-nam$".extractID);
 	assertThrown!AssertError("42-option-name".extractID);
+}
+
+/**
+	Determines whether a range of characters is equal to a D keyword.
+
+	Params:
+		range = An input range whose elements are convertible to `char`.
+*/
+pure
+private bool isKeyword(R)(R range)
+if (isInputRange!R && is(Unqual!(ElementEncodingType!R) : char))
+{
+	import std.algorithm : equal;
+
+	if (range.equal("abstract")) return true;
+	else if (range.equal("alias")) return true;
+	else if (range.equal("align")) return true;
+	else if (range.equal("asm")) return true;
+	else if (range.equal("assert")) return true;
+	else if (range.equal("auto")) return true;
+	else if (range.equal("body")) return true;
+	else if (range.equal("bool")) return true;
+	else if (range.equal("break")) return true;
+	else if (range.equal("byte")) return true;
+	else if (range.equal("case")) return true;
+	else if (range.equal("cast")) return true;
+	else if (range.equal("catch")) return true;
+	else if (range.equal("cdouble")) return true;
+	else if (range.equal("cent")) return true;
+	else if (range.equal("cfloat")) return true;
+	else if (range.equal("char")) return true;
+	else if (range.equal("class")) return true;
+	else if (range.equal("const")) return true;
+	else if (range.equal("continue")) return true;
+	else if (range.equal("creal")) return true;
+	else if (range.equal("dchar")) return true;
+	else if (range.equal("debug")) return true;
+	else if (range.equal("default")) return true;
+	else if (range.equal("delegate")) return true;
+	else if (range.equal("delete")) return true;
+	else if (range.equal("deprecated")) return true;
+	else if (range.equal("do")) return true;
+	else if (range.equal("double")) return true;
+	else if (range.equal("else")) return true;
+	else if (range.equal("enum")) return true;
+	else if (range.equal("export")) return true;
+	else if (range.equal("extern")) return true;
+	else if (range.equal("false")) return true;
+	else if (range.equal("final")) return true;
+	else if (range.equal("finally")) return true;
+	else if (range.equal("float")) return true;
+	else if (range.equal("for")) return true;
+	else if (range.equal("foreach")) return true;
+	else if (range.equal("foreach_reverse")) return true;
+	else if (range.equal("function")) return true;
+	else if (range.equal("goto")) return true;
+	else if (range.equal("idouble")) return true;
+	else if (range.equal("if")) return true;
+	else if (range.equal("ifloat")) return true;
+	else if (range.equal("immutable")) return true;
+	else if (range.equal("import")) return true;
+	else if (range.equal("in")) return true;
+	else if (range.equal("inout")) return true;
+	else if (range.equal("int")) return true;
+	else if (range.equal("interface")) return true;
+	else if (range.equal("invariant")) return true;
+	else if (range.equal("ireal")) return true;
+	else if (range.equal("is")) return true;
+	else if (range.equal("lazy")) return true;
+	else if (range.equal("long")) return true;
+	else if (range.equal("macro")) return true;
+	else if (range.equal("mixin")) return true;
+	else if (range.equal("module")) return true;
+	else if (range.equal("new")) return true;
+	else if (range.equal("nothrow")) return true;
+	else if (range.equal("null")) return true;
+	else if (range.equal("out")) return true;
+	else if (range.equal("override")) return true;
+	else if (range.equal("package")) return true;
+	else if (range.equal("pragma")) return true;
+	else if (range.equal("private")) return true;
+	else if (range.equal("protected")) return true;
+	else if (range.equal("public")) return true;
+	else if (range.equal("pure")) return true;
+	else if (range.equal("real")) return true;
+	else if (range.equal("ref")) return true;
+	else if (range.equal("return")) return true;
+	else if (range.equal("scope")) return true;
+	else if (range.equal("shared")) return true;
+	else if (range.equal("short")) return true;
+	else if (range.equal("static")) return true;
+	else if (range.equal("struct")) return true;
+	else if (range.equal("super")) return true;
+	else if (range.equal("switch")) return true;
+	else if (range.equal("synchronized")) return true;
+	else if (range.equal("template")) return true;
+	else if (range.equal("this")) return true;
+	else if (range.equal("throw")) return true;
+	else if (range.equal("true")) return true;
+	else if (range.equal("try")) return true;
+	else if (range.equal("typeid")) return true;
+	else if (range.equal("typeof")) return true;
+	else if (range.equal("ubyte")) return true;
+	else if (range.equal("ucent")) return true;
+	else if (range.equal("uint")) return true;
+	else if (range.equal("ulong")) return true;
+	else if (range.equal("union")) return true;
+	else if (range.equal("unittest")) return true;
+	else if (range.equal("ushort")) return true;
+	else if (range.equal("version")) return true;
+	else if (range.equal("void")) return true;
+	else if (range.equal("wchar")) return true;
+	else if (range.equal("while")) return true;
+	else if (range.equal("with")) return true;
+	else if (range.equal("__FILE__")) return true;
+	else if (range.equal("__FILE_FULL_PATH__")) return true;
+	else if (range.equal("__MODULE__")) return true;
+	else if (range.equal("__LINE__")) return true;
+	else if (range.equal("__FUNCTION__")) return true;
+	else if (range.equal("__PRETTY_FUNCTION__")) return true;
+	else if (range.equal("__gshared")) return true;
+	else if (range.equal("__traits")) return true;
+	else if (range.equal("__vector")) return true;
+	else if (range.equal("__parameters")) return true;
+
+	return false;
 }
 
 /**
@@ -228,6 +363,8 @@ private mixin template OptionImpl(string nameSpecification, T, alias defaultValu
 	mixin ParameterSettings!settings;
 	/// The option's name specification for use with std.getopt
 	static immutable nameSpec = nameSpecification;
+	/// The option's default value
+	static immutable defVal = defaultValue;
 	/// The option's value
 	T value = defaultValue;
 }
@@ -268,7 +405,11 @@ private mixin template OptionNames(string nameSpecification)
 	static immutable longName = nameSpecification.until("|").until("+").to!string;
 	/// The short, one-letter name of an option. If the spec didn't have one, this will be empty.
 	static immutable shortName = nameSpecification.splitter('|').extractShortName;
-	/// The name used in code generation and the subsequent programming interface to identify an option
+	/**
+		The name used in code generation and the subsequent programming interface to identify an option. If it would
+		have conflicted with a D keyword, e.g. `version`, then an underscore would have been prefixed to it, e.g.
+		"_version".
+	*/
 	static immutable id = longName.extractID;
 }
 
@@ -320,56 +461,63 @@ if (isInputRange!R && is(Unqual!(ElementEncodingType!(ElementType!R)) : char))
 	else return result.front.to!string;
 }
 
+/**
+	Returns the aliases of a command-line option as specified by its name specification.
+
+	Params:
+		spec = The name specification of an command-line option.
+
+	Returns: An array of strings whose elements are the aliases. If no aliases were named in `spec`, then an empty
+		array is returned.
+*/
+pure private string[] extractAliases(string spec)
+{
+	import std.algorithm : filter, map, splitter, until;
+	import std.array : array;
+	import std.conv : to;
+	import std.range : dropOne, walkLength;
+	auto result = spec.splitter("|").dropOne.map!(name => name.until("+")).filter!(name => name.walkLength > 1);
+	if (result.empty) return [];
+	else return result.map!(to!string).array;
+}
+
+unittest
+{
+	assert("verbose|v|garrulous|loquacious".extractAliases == ["garrulous", "loquacious"]);
+	assert("verbose|v".extractAliases.length == 0);
+	assert("verbose".extractAliases.length == 0);
+}
+
 /// Field definitions of command-line parameter settings.
 private mixin template ParameterSettings(settings...)
 {
 	import std.traits : getSymbolsByUDA;
-	static foreach (Setting; getSymbolsByUDA!(tsuruya, ParamSetting))
+	static foreach (setting; settings)
 	{
-		mixin(q{static immutable }, Setting.id, q{ = getSettingValue!(Setting, settings);});
+		mixin(q{static immutable }, typeof(setting).id, q{ = setting.value;});
 	}
 }
 
-///
-private template getSettingValue(Setting, settings...)
-{
-	import std.format : format;
-	import std.meta : staticIndexOf, staticMap;
-	enum idx = staticIndexOf!(Setting, staticMap!(TypeOf, settings));
-	static if (idx == -1) enum getSettingValue = Setting.defVal;
-	else enum getSettingValue = settings[idx].value;
-}
-
-/// Resolves to the type of `instance`.
-private alias TypeOf(alias instance) = typeof(instance);
-
 /// A category under which the command-line parameter is placed in the help text.
-@ParamSetting
-struct ObjectCategory
+struct ParamCategory
 {
 	mixin ParameterSettingImpl!("category", string, "");
 }
 /// A description of the command-line parameter as seen in the help text
-@ParamSetting
-struct OptionDesc
+struct ParamDesc
 {
 	mixin ParameterSettingImpl!("desc", string, "");
 }
 /// A more elaborated description of the command-line parameter
-@ParamSetting
-struct OptionHelp
+struct ParamHelp
 {
 	mixin ParameterSettingImpl!("help", string, "");
 }
 /// A signal as to whether the command-line parameter is required to be present in the command-line arguments.
-@ParamSetting
-struct OptionRequired
+struct ParamRequired
 {
 	mixin ParameterSettingImpl!("required", bool);
 }
-
-/// Attribute to identify aggregates as possible command-line parameter settings
-private enum ParamSetting;
 
 /// Command-line parameter setting implementation
 private mixin template ParameterSettingImpl(string identifier, T, T defaultValue = T.init)
@@ -384,16 +532,20 @@ private mixin template ParameterSettingImpl(string identifier, T, T defaultValue
 auto parseArgs(CommandLineParameters...)(string[] args)
 {
 	import std.getopt : config, getopt;
-	import std.meta : ApplyLeft, Filter;
+	import std.meta : AliasSeq, ApplyLeft, Filter;
+	import std.path : baseName;
 	import std.traits : hasMember;
 
 	alias Operands = Filter!(ApplyLeft!(isInstanceOf, Operand), CommandLineParameters);
-	alias Options = Filter!(ApplyLeft!(isInstanceOf, Option), CommandLineParameters);
+	// When creating `Options`, we must ensure that the help option, which will be added if it wasn't specified, is the
+	// first element; `getopt` will only handle it during the first invocation.
+	enum isHelpOption(Option) = Option.longName == "help" && Option.shortName == "h";
+	alias Options = BringToFront!(isHelpOption, Option!("help|h", bool, ParamDesc("Print this help")),
+		Filter!(ApplyLeft!(isInstanceOf, Option), CommandLineParameters));
+	alias CommandLineParameters = AliasSeq!(Operands, Options);
 	Operands operands;
 	Options options;
 
-	// Due to how std.getopt seemingly works, the first invocation is the one that will determine if help was requested.
-	immutable helpWanted = args.getopt(config.passThrough).helpWanted;
 	static foreach (i, Opt; Options)
 	{{
 		alias opt = options[i];
@@ -417,10 +569,9 @@ auto parseArgs(CommandLineParameters...)(string[] args)
 			import std.conv : to;
 			import std.traits : isDynamicArray, isMutable, isSomeString, isStaticArray;
 			alias Oper = Operands[operNum];
-			/*
-				If an operand has a process method defined, then the handling of arguments is determined by the type of
-				that method's parameter.
-			*/
+
+			// If an operand has a process method defined, then the handling of arguments is determined by the type of
+			// that method's parameter.
 			static if (hasMember!(Oper, "proc"))
 			{
 				alias ProcParamType = Parameters!(oper.proc)[0];
@@ -484,14 +635,27 @@ auto parseArgs(CommandLineParameters...)(string[] args)
 
 	static struct ParseArgsResult
 	{
-		bool helpWanted;
+		/// Writes the program's usage text to stdout.
+		void writeUsage()
+		{
+			import std.stdio : writeln;
+			generateUsageText!CommandLineParameters(_programName).writeln;
+		}
+
+		/// Writes the program's help text to stdout.
+		void writeHelp()
+		{
+			writeUsage;
+			generateAndWriteHelp!CommandLineParameters;
+		}
+
 		_Operands operands;
 		_Options options;
 	private:
-		/*
-			It would be nice to avoid initializing the fields when defining them, since they'll be assigned a value
-			before use, but to handle symbols unknown to this scope, type inference, to my knowledge, is necessary.
-		*/
+		// It would be nice to avoid initializing the fields in `_Operands` and `_Options` when defining them, since
+		// they'll be assigned a value later and before use, but to handle symbols unknown to this scope, type
+		// inference, to my knowledge, is necessary.
+
 		static struct _Operands
 		{
 			static foreach (Oper; Operands) mixin("auto ", Oper.id, q{ = Oper.value.init;});
@@ -500,13 +664,74 @@ auto parseArgs(CommandLineParameters...)(string[] args)
 		{
 			static foreach (Opt; Options) mixin("auto ", Opt.id, q{ = Opt.value.init;});
 		}
+		string _programName;
 	}
 
 	ParseArgsResult result;
 	static foreach (i, Oper; Operands) __traits(getMember, result.operands, Oper.id) = operands[i].value;
 	static foreach (i, Opt; Options) __traits(getMember, result.options, Opt.id) = options[i].value;
-	result.helpWanted = helpWanted;
+	result._programName = args[0].baseName;
 	return result;
+}
+
+/**
+	Returns an alias sequence that begins with the first element of `TList` that satisfies `pred` and whose remaining
+	elements are `TList` sans the "moved" element. If no such element exists, then `def` will occupy the first slot in
+	returned alias sequence and the subsequent elements are `TList`.
+*/
+private template BringToFront(alias pred, alias def, TList...)
+{
+	import std.meta : AliasSeq, Erase, Filter;
+	alias Result = Filter!(pred, TList);
+	static if (Result.length == 0) alias BringToFront = AliasSeq!(def, TList);
+	else alias BringToFront = AliasSeq!(Result[0], Erase!(Result[0], TList));
+}
+
+unittest
+{
+	import std.meta : AliasSeq;
+	import std.traits : isIntegral;
+	static assert(is(BringToFront!(isIntegral, int, char, string, long) == AliasSeq!(long, char, string)));
+	static assert(is(BringToFront!(isIntegral, int, char, string, float) == AliasSeq!(int, char, string, float)));
+}
+
+/// Generates the usage text, e.g. "Usage: ...".
+pure
+private string generateUsageText(CommandLineParameters...)(string programName)
+{
+	import std.format : format;
+	import std.meta : ApplyLeft, Filter;
+
+	alias Operands = Filter!(ApplyLeft!(isInstanceOf, Operand), CommandLineParameters);
+	auto usage = format!"Usage: %s"(programName);
+	static foreach (Oper; Operands) usage ~= format!" <%s>"(Oper.name);
+	usage ~= " [options]";
+	return usage;
+}
+
+/// Generates and writes the help text to stdout.
+private void generateAndWriteHelp(CommandLineParameters...)()
+{
+	import std.meta : ApplyLeft, Filter, staticSort;
+	import std.stdio : write, writef, writefln, writeln;
+	import std.traits : hasStaticMember;
+
+	alias Operands = Filter!(ApplyLeft!(isInstanceOf, Operand), CommandLineParameters);
+	enum sortOptionsByLongName(Opt1, Opt2) = Opt1.longName < Opt2.longName;
+	alias Options = staticSort!(sortOptionsByLongName, Filter!(ApplyLeft!(isInstanceOf, Option), CommandLineParameters));
+
+	immutable tab = "    ";
+
+	writeln("Options:");
+
+	static foreach (Opt; Options)
+	{
+		write(tab);
+		static if (Opt.shortName.length > 0) writef!"-%s, "(Opt.shortName);
+		writef!"--%s"(Opt.longName);
+		static if (hasStaticMember!(Opt, "desc")) writef!"%s%s (default: %s)"(tab, Opt.desc, Opt.defVal);
+		writeln;
+	}
 }
 
 /// The class from which all exceptions thrown from `parseArgs` are derived.
@@ -524,7 +749,7 @@ class ParseArgsException : Exception
 	Thrown when a command-line parameter takes on a command-line argument's value that is invalid by the parameter's
 	specification.
 */
-class InvalidParameterException : ParseArgsException
+class InvalidArgumentException : ParseArgsException
 {
 	/// Constructor
 	nothrow pure @nogc
